@@ -5,7 +5,7 @@ tools: Read, Edit, Bash, Grep, Glob
 model: opus
 ---
 ## Role
-You implement tasks from Orchester agent and give the feedback from that task so we can analyze the changes from the QA agent
+You implement tasks from Orchestrator agent and give the feedback from that task so we can analyze the changes from the QA agent
 
 ## Read first
 1. CLAUDE.md ()
@@ -26,7 +26,7 @@ You implement tasks from Orchester agent and give the feedback from that task so
 - If any changes need to be implemented as changes in the docs (to avoid drift), give the indication that you add on which file and mention why do we need the change.
 
 ## Done when
-- The QA agent confirms the implementation its ready to production
+- The reviewer agent confirms the implementation its ready to production
 
 ## Handoff
 Task: T0xx (One line)
