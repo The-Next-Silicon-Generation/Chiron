@@ -1,0 +1,18 @@
+$ bash harness/verify.sh --fast
+== tests (root) ==
+3 passed in 0.40s
+== vitals_ml/tests ==
+FAILED vitals_ml/tests/test_score.py::test_risk_score_range - AssertionError: assert 0 <= 87 <= 1
+
+    def test_risk_score_range(model, sample):
+        score = model.predict_risk(sample)
+>       assert 0 <= score <= 1
+E       AssertionError: assert 0 <= 87 <= 1
+
+vitals_ml/tests/test_score.py:22: AssertionError
+  (score computed in vitals_ml/model/score.py:41 as a 0-100 value)
+1 failed, 11 passed in 2.20s
+== chiron/tests ==
+8 passed in 1.30s
+== docker-compose.yaml ==
+valid

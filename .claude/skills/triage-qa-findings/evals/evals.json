@@ -1,0 +1,59 @@
+{
+  "skill_name": "triage-qa-findings",
+  "description": "Each case gives a test output and checks that the skill picks the expected category, verdict and next owner.",
+  "evals": [
+    {
+      "id": 1,
+      "name": "product-bug-health",
+      "prompt": "Triage the test output in evals/cases/product-bug.txt for task T012. The spec (AC2) says GET /health returns 200 with {\"status\": \"ok\"}.",
+      "files": ["evals/cases/product-bug.txt"],
+      "expected_output": "One bug classified PRODUCT_BUG, verdict NOT READY, next owner developer, location in product code, protected guarantee /health marked FAIL.",
+      "assertions": [
+        "Classifies the failure as PRODUCT_BUG",
+        "Verdict is NOT READY",
+        "Next owner is developer",
+        "Bug has Repro, Expected, Actual and Location fields",
+        "Does not edit any product or test file"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "env-issue-docker",
+      "prompt": "Triage the test output in evals/cases/env-issue.txt for task T013.",
+      "files": ["evals/cases/env-issue.txt"],
+      "expected_output": "Classified ENV_ISSUE, verdict NOT READY, next owner orchestrator. Not blamed on the code.",
+      "assertions": [
+        "Classifies the failure as ENV_ISSUE",
+        "Verdict is NOT READY",
+        "Next owner is orchestrator",
+        "Does not report a PRODUCT_BUG"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "ambiguous-spec",
+      "prompt": "Triage the test output in evals/cases/spec-unclear.txt for task T014. The spec only says 'risk score is returned'. It does not give a range.",
+      "files": ["evals/cases/spec-unclear.txt"],
+      "expected_output": "Classified SPEC_UNCLEAR (not TEST_BUG), listed in Open questions, next owner orchestrator.",
+      "assertions": [
+        "Classifies the failure as SPEC_UNCLEAR",
+        "Does not classify it as TEST_BUG",
+        "Adds an entry to Open questions",
+        "Next owner is orchestrator"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "all-pass",
+      "prompt": "Triage the test output in evals/cases/all-pass.txt for task T015.",
+      "files": ["evals/cases/all-pass.txt"],
+      "expected_output": "Verdict READY, Bugs: none, next owner orchestrator; /health SKIPPED with reason because --fast was used.",
+      "assertions": [
+        "Verdict is READY",
+        "Bugs is none",
+        "Next owner is orchestrator",
+        "stack /health is SKIPPED with a reason, not PASS"
+      ]
+    }
+  ]
+}
