@@ -1,0 +1,50 @@
+# CD = Continuous Delivery (CONV §3): publish images to GitHub Container
+# Registry (ARCH §Infrastructure). Runs only after CI succeeded on main.
+name: CD
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    name: Publish images to GHCR
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image names
+        env:
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "BACKEND_IMAGE=ghcr.io/${owner}/chiron" >> "$GITHUB_ENV"
+          echo "ML_IMAGE=ghcr.io/${owner}/chiron-ml" >> "$GITHUB_ENV"
+          echo "TAG=sha-${SHA}" >> "$GITHUB_ENV"
+
+      - name: Build and push backend image
+        run: |
+          docker build -t "$BACKEND_IMAGE:$TAG" -t "$BACKEND_IMAGE:latest" -f Dockerfile .
+          docker push "$BACKEND_IMAGE:$TAG"
+          docker push "$BACKEND_IMAGE:latest"
+
+      - name: Build and push ML image
+        run: |
+          docker build -t "$ML_IMAGE:$TAG" -t "$ML_IMAGE:latest" -f ml_worker/Dockerfile ml_worker
+          docker push "$ML_IMAGE:$TAG"
+          docker push "$ML_IMAGE:latest"

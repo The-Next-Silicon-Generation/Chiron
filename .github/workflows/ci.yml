@@ -1,0 +1,59 @@
+# CI = testing phase (CONV §3). Runs on every push and pull request.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test backend
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+
+      - name: Install runtime dependencies
+        run: pip install --no-cache-dir -r requirements.txt
+
+      - name: Install test dependencies (if present)
+        run: |
+          if [ -f requirements-dev.txt ]; then
+            pip install --no-cache-dir -r requirements-dev.txt
+          fi
+
+      - name: Smoke check (backend app imports)
+        run: python -c "from app.main import app; print(app.title)"
+
+      - name: Run tests (picked up automatically once tests/test_*.py exist)
+        run: |
+          if find tests -name 'test_*.py' | grep -q .; then
+            python -m pytest tests
+          else
+            echo "::notice::No tests found in tests/ yet; test step skipped."
+          fi
+
+  docker-build:
+    name: Build images
+    needs: test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build backend image
+        run: docker build -t chiron:ci -f Dockerfile .
+
+      - name: Check backend image
+        run: docker run --rm chiron:ci python -c "from app.main import app; print(app.title)"
+
+      - name: Build ML image
+        run: docker build -t chiron-ml:ci -f ml_worker/Dockerfile ml_worker
+
+      - name: Check ML image dependencies
+        run: docker run --rm chiron-ml:ci sh -c "pip check && python -c 'import autogluon.tabular; import ml_service'"

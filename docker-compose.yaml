@@ -1,36 +1,43 @@
 services:
-  
-  Chiron:
-    build:
-          context: ./chiron
-          dockerfile: Dockerfile
-    container_name: Chiron
-    restart: unless-stopped
-    ports:
-          - "8080:8080"
-    environment:
-          - AUTOGLUON_SERVICE_URL=http://autogluon:8001
-    depends_on:
-          - autogluon
-    networks:
-          - chiron-network
-    
-  autogluon:
-    image: autogluon/autogluon:1.3.1-cpu-framework-ubuntu22.04-py3.11
-    container_name: autogluon
-    restart: unless-stopped
-    working_dir: /app
-    volumes:
-          - ./ml_worker:/app
-          - ./trained_model:/app/AutogluonModels
 
-    command: >
-      sh -c "pip install -q fastapi 'uvicorn[standard]' &&
-             uvicorn ml_service:app --host 0.0.0.0 --port 8001"
+  chiron:
+    image: ghcr.io/the-next-silicon-generation/chiron:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
     ports:
-          - "8001:8001"
+      - "8080:8080"
+    environment:
+      - AUTOGLUON_SERVICE_URL=http://autogluon:8001
+    depends_on:
+      autogluon:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     networks:
-          - chiron-network
+      - chiron-network
+
+  autogluon:
+    image: ghcr.io/the-next-silicon-generation/chiron-ml:${IMAGE_TAG:-latest}
+    build:
+      context: ./ml_worker
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    volumes:
+      - ./trained_model:/app/AutogluonModels:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - chiron-network
 
 networks:
   chiron-network:
