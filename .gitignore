@@ -10,7 +10,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+/lib/
 lib64/
 parts/
 sdist/
@@ -50,3 +50,10 @@ htmlcov/
 # --- Sistema Operativo ---
 .DS_Store
 Thumbs.db
+
+# --- Claude Code (configuracion local por maquina, no subir) ---
+.claude/settings.local.json
+
+# --- Modelos entrenados (artefactos de AutoGluon, no subir) ---
+trained_model/
+AutogluonModels/

@@ -1,39 +1,57 @@
-const API_BASE_URL = 'http://localhost:8000/api';
+const WS_URL = 'ws://localhost:8080/ws/vitals'; // puerto del backend (T18); host fijo (T19)
 const USE_MOCK = true; // Cambiar a false cuando conectes tu backend real
+const STALE_MS = 5000; // sin datos nuevos en este tiempo => se descartan (igual que index.html)
+
+// Transporte en vivo: solo WebSocket (CONV §1).
+// Contrato del mensaje (T7, el mismo que index.html y app/main.py):
+// { astronaut_id, name?, ts?, vitals:{ spo2, hr, rr, urine, bv }, ml?:{ triage, label, prob, flags } }
+let socket = null;
+let latest = null;
+let latestAt = 0;
+
+const isValid = (m) =>
+  m && typeof m === 'object' && typeof m.astronaut_id === 'string' && m.astronaut_id !== '' &&
+  m.vitals && typeof m.vitals === 'object';
+
+function connect() {
+  if (socket && socket.readyState <= WebSocket.OPEN) return;
+  socket = new WebSocket(WS_URL);
+  socket.onmessage = (e) => {
+    let m;
+    try { m = JSON.parse(e.data); } catch (_) { console.warn('Mensaje WebSocket no es JSON'); return; }
+    if (!isValid(m)) { console.warn('Mensaje WebSocket fuera de contrato', m); return; }
+    latest = m;
+    latestAt = Date.now();
+  };
+  socket.onerror = () => { socket.close(); };
+  socket.onclose = () => { socket = null; latest = null; latestAt = 0; };
+}
 
 export async function fetchTelemetryAndPrediction() {
   if (!USE_MOCK) {
-    const response = await fetch(`${API_BASE_URL}/monitor`);
-    if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
-    return await response.json();
+    connect();
+    if (!latest || Date.now() - latestAt > STALE_MS) {
+      latest = null;
+      throw new Error('Sin datos recientes del WebSocket');
+    }
+    return latest;
   }
 
-  // Simulación del payload JSON que devolvería tu backend con el modelo ML
-  const rand = (min, max) => +(Math.random() * (max - min) + min).toFixed(2);
-  const v1 = rand(65, 98);
-  const isAlert = v1 > 90;
+  // Simulación de un mensaje del backend con el mismo contrato (T7)
+  const rand = (min, max) => +(Math.random() * (max - min) + min).toFixed(1);
+  const hr = rand(60, 125);
+  const isAlert = hr > 100;
 
   return {
-    timestamp: new Date().toLocaleTimeString(),
-    variables: [
-      { id: 'var1', label: 'Variable 1 (Temperatura)', unit: '°C', value: v1 },
-      { id: 'var2', label: 'Variable 2 (Presión)', unit: 'kPa', value: rand(100, 115) },
-      { id: 'var3', label: 'Variable 3 (Frecuencia)', unit: 'Hz', value: rand(48, 62) },
-      { id: 'var4', label: 'Variable 4 (Flujo)', unit: 'L/m', value: rand(12, 25) },
-      { id: 'var5', label: 'Variable 5 (Voltaje)', unit: 'V', value: rand(215, 225) }
-    ],
-    clasificador: {
-      clase: isAlert ? 'ANOMALÍA DETECTADA' : 'OPERACIÓN NORMAL',
-      estado: isAlert ? 'alerta' : 'normal', // 'normal' | 'alerta' | 'critico'
-      confianza: isAlert ? 94.2 : 98.7,
-      probabilidades: [
-        { etiqueta: 'Normal', valor: isAlert ? 5.8 : 98.7 },
-        { etiqueta: 'Desviación Térmica', valor: isAlert ? 94.2 : 1.3 },
-        { etiqueta: 'Fallo Crítico', valor: 0.0 }
-      ],
-      detalle: isAlert
-        ? 'La Variable 1 supera el umbral estadístico esperado según la ventana temporal del modelo.'
-        : 'Las 5 variables se mantienen dentro de los parámetros nominales de inferencia.'
+    astronaut_id: 'A-01',
+    name: 'Ares',
+    ts: Date.now(),
+    vitals: { spo2: rand(94, 99), hr, rr: rand(12, 20), urine: rand(30, 90), bv: rand(92, 102) },
+    ml: {
+      triage: isAlert ? 'amber' : 'green',
+      label: isAlert ? 'Pulso elevado' : 'Rangos normales',
+      prob: isAlert ? 0.94 : 0.98,
+      flags: { hr: isAlert ? 'amber' : 'green' }
     }
   };
 }

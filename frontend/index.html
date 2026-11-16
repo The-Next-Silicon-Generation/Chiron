@@ -132,7 +132,8 @@ h2{font-size:15px;font-weight:500;color:var(--mute);margin-bottom:10px}
 
 <script>
 /* ============ CONFIGURACIÓN ============
-   ?mode=mock | ws | sse | poll   &url=...
+   ?mode=ws | mock   &url=...
+   Transporte en vivo: solo WebSocket (CONV §1). "mock" = demo sin red (no contacta al backend).
    Formato esperado del backend (un objeto o un arreglo de objetos):
    { "astronaut_id":"A-01", "name":"Ares", "ts":1731700000000,
      "vitals":{ "spo2":97, "hr":74, "rr":16, "urine":52, "bv":98 },
@@ -141,9 +142,8 @@ h2{font-size:15px;font-weight:500;color:var(--mute);margin-bottom:10px}
    Si llega "ml.triage" manda el modelo; si no, se calcula con los rangos de VARS. */
 const Q = new URLSearchParams(location.search);
 const CONFIG = {
-  mode: Q.get('mode') || 'mock',
-  url: Q.get('url') || 'ws://localhost:8000/ws/vitals',
-  pollMs: 1000,
+  mode: Q.get('mode') || 'ws',
+  url: Q.get('url') || 'ws://localhost:8080/ws/vitals',
   window: 60,          // puntos visibles por gráfica
   staleMs: 5000        // sin datos => "Sin señal"
 };
@@ -154,7 +154,7 @@ const VARS = [
   {k:'hr',    name:'Frecuencia cardiaca', unit:'lpm',       g:[60,100], a:[50,120], min:30, max:160, zone:'corazón'},
   {k:'rr',    name:'Frecuencia respiratoria', unit:'rpm',   g:[12,20],  a:[8,24],   min:4,  max:34,  zone:'tórax'},
   {k:'urine', name:'Uresis (volumen)',    unit:'mL/h',      g:[30,100], a:[15,150], min:0,  max:200, zone:'riñón / abdomen'},
-  {k:'bv',    name:'Volumen sanguíneo',   unit:'% del basal', g:[90,200], a:[80,200], min:60, max:110, zone:'piernas / circulación'}
+  {k:'bv',    name:'Volumen sanguíneo',   unit:'% del basal', g:[90,110], a:[80,120], min:60, max:130, zone:'piernas / circulación'}
 ];
 const COL = {green:'#3ddc97', amber:'#ffb938', red:'#ff5d6c'};
 const RANK = {green:0, amber:1, red:2};
@@ -167,7 +167,8 @@ const MSG = { // [bajo, alto] → [ámbar, rojo]
       ['Respiración acelerada: posible esfuerzo, ansiedad o aumento de CO₂.','Respiración muy acelerada: posible falla respiratoria, CO₂ alto o acidosis.']],
   urine:[['Orina baja: posible deshidratación o menor flujo a los riñones.','Orina casi nula: riesgo de hipovolemia o daño renal. Revisar hidratación.'],
          ['Orina alta: posible exceso de líquidos o redistribución de fluidos por microgravedad.','Orina muy alta: riesgo de deshidratación y pérdida de electrolitos.']],
-  bv:[['Volumen algo bajo: posible deshidratación o redistribución de fluidos.','Pérdida importante de volumen: posible hemorragia o hipovolemia severa. Atención inmediata.']]
+  bv:[['Volumen algo bajo: posible deshidratación o redistribución de fluidos.','Pérdida importante de volumen: posible hemorragia o hipovolemia severa. Atención inmediata.'],
+      ['Volumen algo alto: posible sobrecarga de líquidos o redistribución de fluidos.','Volumen muy alto: posible sobrecarga de volumen (hipervolemia). Valorar de inmediato.']]
 };
 
 /* ============ ESTADO ============ */
@@ -176,6 +177,7 @@ const S = {crew:new Map(), sel:null, vk:'spo2', open:false, last:0};
 let dirty = false;
 
 const rate = (v,x) => (x>=v.g[0] && x<=v.g[1]) ? 'green' : (x>=v.a[0] && x<=v.a[1]) ? 'amber' : 'red';
+const isTri = s => Object.prototype.hasOwnProperty.call(RANK, s);   // green/amber/red
 const worst = st => Object.values(st).reduce((w,s) => RANK[s]>RANK[w] ? s : w, 'green');
 const esc = t => String(t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmt = x => x==null ? '--' : Math.round(x);
@@ -194,16 +196,17 @@ function ingest(m){
     buildChips();
   }
   if(m.name) a.name = m.name;
-  const flags = (m.ml && m.ml.flags) || {};
+  const ml = m.ml && typeof m.ml === 'object' && !Array.isArray(m.ml) ? m.ml : null;
+  const flags = ml && ml.flags && typeof ml.flags === 'object' && !Array.isArray(ml.flags) ? ml.flags : {};
   VARS.forEach(v => {
     const x = Number(m.vitals[v.k]);
     if(!isFinite(x)) return;
     const arr = a.s[v.k]; arr.push(x); if(arr.length > CONFIG.window) arr.shift();
     a.last[v.k] = x;
-    a.st[v.k] = flags[v.k] || rate(v,x);
+    a.st[v.k] = isTri(flags[v.k]) ? flags[v.k] : rate(v,x);   // solo green/amber/red; si no, rangos
   });
-  a.ml = m.ml || null;
-  a.tri = (m.ml && m.ml.triage) || worst(a.st);
+  a.ml = ml;
+  a.tri = ml && isTri(ml.triage) ? ml.triage : worst(a.st);   // triage desconocido => rangos
   S.last = Date.now();
   dirty = true; requestAnimationFrame(render);
 }
@@ -217,21 +220,6 @@ function openWS(){
   w.onopen = () => { retry = 0; setConn('ok','En vivo · WebSocket'); };
   w.onmessage = e => { try{ ingest(JSON.parse(e.data)); }catch(_){} };
   w.onclose = () => { setConn('bad','Reconectando…'); setTimeout(openWS, Math.min(15000, 500*2**retry++)); };
-}
-function openSSE(){
-  setConn('wait','Conectando…');
-  const e = new EventSource(CONFIG.url);
-  e.onopen = () => setConn('ok','En vivo · SSE');
-  e.onmessage = ev => { try{ ingest(JSON.parse(ev.data)); }catch(_){} };
-  e.onerror = () => setConn('bad','Reconectando…');   // EventSource reintenta solo
-}
-async function poll(){
-  try{
-    const c = new AbortController(); const t = setTimeout(() => c.abort(), 4000);
-    const r = await fetch(CONFIG.url, {signal:c.signal, cache:'no-store'}); clearTimeout(t);
-    ingest(await r.json()); setConn('ok','En vivo · consulta cada '+CONFIG.pollMs/1000+' s');
-  }catch(_){ setConn('bad','Reconectando…'); }
-  setTimeout(poll, CONFIG.pollMs);
 }
 function mock(){
   setConn('demo','Modo demo · datos simulados');
@@ -350,7 +338,7 @@ setInterval(() => {
 
 /* ============ INICIO ============ */
 buildCards();
-({mock, ws:openWS, sse:openSSE, poll}[CONFIG.mode] || mock)();
+({mock, ws:openWS}[CONFIG.mode] || openWS)();
 </script>
 </body>
 </html>

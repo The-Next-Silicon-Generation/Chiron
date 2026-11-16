@@ -1,0 +1,44 @@
+# Docker build context for the backend image (root Dockerfile).
+# The image only needs app/ and requirements.txt; everything else stays out.
+
+# VCS, CI and agent harness
+.git
+.github
+.claude
+.gitignore
+.dockerignore
+
+# Docs, tasks, progress, harness scripts and tests
+docs
+tasks
+progress
+harness
+tests
+README.md
+AGENTS.md
+CLAUDE.md
+
+# Other services / not served by the backend image
+frontend
+ml_worker
+trained_model
+
+# Build/deploy files
+Dockerfile
+docker-compose.yaml
+
+# Media (kept in repo, human decision 3)
+**/*.mp4
+
+# Secrets
+**/.env
+**/.env.*
+
+# Python caches and virtualenvs
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+.venv
+venv
+env
+ENV
