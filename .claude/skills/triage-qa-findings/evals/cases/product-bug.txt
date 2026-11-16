@@ -1,0 +1,19 @@
+$ bash harness/verify.sh --fast
+== tests (root) ==
+3 passed in 0.41s
+== vitals_ml/tests ==
+12 passed in 2.10s
+== chiron/tests ==
+FAILED chiron/tests/test_api.py::test_health_returns_ok - AssertionError: assert {'status': 'up'} == {'status': 'ok'}
+
+    def test_health_returns_ok(client):
+        r = client.get("/health")
+        assert r.status_code == 200
+>       assert r.json() == {"status": "ok"}
+E       AssertionError: assert {'status': 'up'} == {'status': 'ok'}
+
+chiron/tests/test_api.py:18: AssertionError
+  (response built in chiron/app/routes/health.py:9)
+1 failed, 7 passed in 1.32s
+== docker-compose.yaml ==
+valid

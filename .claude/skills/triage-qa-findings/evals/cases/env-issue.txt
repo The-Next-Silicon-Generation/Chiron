@@ -1,0 +1,12 @@
+$ bash harness/verify.sh --full
+== tests (root) ==
+3 passed in 0.39s
+== vitals_ml/tests ==
+12 passed in 2.05s
+== chiron/tests ==
+8 passed in 1.28s
+== docker-compose.yaml ==
+valid
+== stack /health ==
+Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?
+ERROR: stack failed to start
