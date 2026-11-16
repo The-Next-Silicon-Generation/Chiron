@@ -41,3 +41,11 @@ This two have the next format:
 
 - For every task the format is: tasks/TASK 0xx Name
 - And in progress the associated task have the same name: progress/TASK 0xx Name
+
+## 5. Triage
+
+For the triage the levels are:
+
+- "Rangos normales": Normal ranges
+- "Vigilancia": Warning ranges
+- "Atención inmediata": Critics ranges
