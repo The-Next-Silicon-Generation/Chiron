@@ -43,8 +43,9 @@ for this objective.
 
 ### Comunication between internal sockets:
 
-- The open port for comunication between the backend and the ML is: 80002
+- The open port for comunication between the backend and the predictive model is: 80002
 - The open port for comunication between database and backend is: 3306
+- The open port for comunication between the backend and the contextual model is: 80003
 
 ## MACHINE LEARNING
 
@@ -107,8 +108,12 @@ the ML predictive model, via API.
 Then the backend listen for the alerts on the model side and when an alert gets through
 the interface using defaults variables of clasification do the triage functions.
 
-When the data gets triaged this code modules pass the full information 
+When the data gets triaged, we add the info to a JSON full context (Json response from
+the predictive model + classfication from the backend) and that's the data that the second
+model uses to decided the truth of the alert. This comunications parts from the API between
+the clasificator code and the classification model.
 
+Finally, the full pipeline transform the data for the frontend comunication.
 
 ## FRONTEND
 Estructura del archivo
@@ -351,4 +356,7 @@ Umbrales de patrones	                      Los de findings están fijos en códi
 Valor por defecto de CONFIG.mode	          Debe fijarse al transporte de producción antes del despliegue
 WebSocket	                                  No se guarda el manejador de la conexión, por lo que no se puede cerrar de forma limpia
 Sin autenticación	                          Las credenciales, si se requieren, deben agregarse en el conector
-Fuente	                                      Depende de Google Fonts; sin internet se usa la monoespaciada del sistema
+
+
+
+
